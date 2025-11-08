@@ -1,0 +1,23 @@
+{
+  "name": "hackathon-rome-2025-root",
+  "version": "1.0.0",
+  "description": "Hackathon Rome 2025 - Root package",
+  "private": true,
+  "scripts": {
+    "dev": "cd hackaton-rome-2025- && npm run dev",
+    "dev:backend": "cd hackaton-rome-2025- && npm run dev:backend",
+    "dev:frontend-startuper": "cd hackaton-rome-2025- && npm run dev:frontend-startuper",
+    "dev:frontend-user": "cd hackaton-rome-2025- && npm run dev:frontend-user",
+    "install:all": "cd hackaton-rome-2025- && npm run install:all",
+    "build": "cd hackaton-rome-2025- && npm run build"
+  },
+  "keywords": [
+    "crowdfunding",
+    "xrpl",
+    "blockchain",
+    "hackathon"
+  ],
+  "author": "Hackathon Rome 2025 Team",
+  "license": "ISC"
+}
+
