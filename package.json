@@ -1,15 +1,21 @@
 {
-  "name": "hackathon-rome-2025-root",
+  "name": "hackathon-rome-2025",
   "version": "1.0.0",
-  "description": "Hackathon Rome 2025 - Root package",
+  "description": "Hackathon Rome 2025 - Crowdfunding Platform",
   "private": true,
   "scripts": {
-    "dev": "cd hackaton-rome-2025- && npm run dev",
-    "dev:backend": "cd hackaton-rome-2025- && npm run dev:backend",
-    "dev:frontend-startuper": "cd hackaton-rome-2025- && npm run dev:frontend-startuper",
-    "dev:frontend-user": "cd hackaton-rome-2025- && npm run dev:frontend-user",
-    "install:all": "cd hackaton-rome-2025- && npm run install:all",
-    "build": "cd hackaton-rome-2025- && npm run build"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend-startuper\" \"npm run dev:frontend-user\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend-startuper": "cd frontend-startuper && npm run dev",
+    "dev:frontend-user": "cd frontend-user && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend-startuper && npm install && cd ../frontend-user && npm install",
+    "build": "npm run build:backend && npm run build:frontend-startuper && npm run build:frontend-user",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend-startuper": "cd frontend-startuper && npm run build",
+    "build:frontend-user": "cd frontend-user && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   },
   "keywords": [
     "crowdfunding",

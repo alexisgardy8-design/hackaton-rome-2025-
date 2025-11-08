@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - represents both startups and investors
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String   // Hashed with bcrypt
+  name          String
+  role          Role     @default(INVESTOR)
+  walletAddress String?  // XRPL wallet address (optional)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  campaigns   Campaign[]   @relation("CampaignCreator")
+  investments Investment[] @relation("InvestorInvestments")
+
+  @@index([email])
+  @@map("users")
+}
+
+// Campaign model - represents crowdfunding campaigns
+model Campaign {
+  id            String         @id @default(cuid())
+  title         String
+  description   String         @db.Text
+  goalAmount    Decimal        @db.Decimal(18, 2) // Total amount to raise
+  currentAmount Decimal        @default(0) @db.Decimal(18, 2) // Amount raised so far
+  startDate     DateTime
+  endDate       DateTime
+  status        CampaignStatus @default(DRAFT)
+  imageUrl      String?        // Optional campaign image
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  creator     User         @relation("CampaignCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId   String
+  investments Investment[] @relation("CampaignInvestments")
+  dividends   Dividend[]   @relation("CampaignDividends")
+  token       Token?       @relation("CampaignToken")
+
+  @@index([creatorId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+// Investment model - represents individual investments in campaigns
+model Investment {
+  id              String   @id @default(cuid())
+  amount          Decimal  @db.Decimal(18, 2)
+  transactionHash String?  // XRPL transaction hash
+  createdAt       DateTime @default(now())
+
+  // Relations
+  investor   User     @relation("InvestorInvestments", fields: [investorId], references: [id], onDelete: Cascade)
+  investorId String
+  campaign   Campaign @relation("CampaignInvestments", fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  @@index([investorId])
+  @@index([campaignId])
+  @@map("investments")
+}
+
+// Dividend model - represents dividend distributions to investors
+model Dividend {
+  id                String              @id @default(cuid())
+  totalAmount       Decimal             @db.Decimal(18, 2) // Total amount to distribute
+  distributedAmount Decimal             @default(0) @db.Decimal(18, 2) // Amount successfully distributed
+  asset             String              @default("XRP") // Asset to distribute: "XRP" or token currency code
+  issuerAddress     String?             // Required for token dividends (issuer address)
+  distributionType  DistributionType    @default(BY_INVESTMENT) // How to calculate shares
+  distributionDate  DateTime            // When distribution was initiated
+  status            DividendStatus      @default(PENDING)
+  notes             String?             @db.Text // Optional notes/reason for dividend
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  campaign   Campaign          @relation("CampaignDividends", fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  payments   DividendPayment[] @relation("DividendPayments")
+
+  @@index([campaignId])
+  @@index([status])
+  @@map("dividends")
+}
+
+// DividendPayment model - tracks individual dividend payments to each investor
+model DividendPayment {
+  id              String               @id @default(cuid())
+  investorAddress String               // XRPL wallet address of investor
+  amount          Decimal              @db.Decimal(18, 2) // Amount paid to this investor
+  transactionHash String?              // XRPL transaction hash
+  status          DividendPaymentStatus @default(PENDING)
+  errorMessage    String?              @db.Text // Error details if payment failed
+  paidAt          DateTime?            // When payment was successfully sent
+  createdAt       DateTime             @default(now())
+
+  // Relations
+  dividend   Dividend @relation("DividendPayments", fields: [dividendId], references: [id], onDelete: Cascade)
+  dividendId String
+
+  @@index([dividendId])
+  @@index([investorAddress])
+  @@index([status])
+  @@map("dividend_payments")
+}
+
+// Token model - represents XRPL tokens issued for campaigns
+model Token {
+  id                String      @id @default(cuid())
+  symbol            String      // Token symbol (e.g., "ABC" - max 3 chars for standard, 40 for hex)
+  issuerAddress     String      // XRPL wallet address of the issuer (platform)
+  totalSupply       Decimal     @db.Decimal(18, 2) // Total tokens to be distributed
+  distributedAmount Decimal     @default(0) @db.Decimal(18, 2) // Amount already distributed
+  status            TokenStatus @default(ISSUED)
+  metadata          Json?       // Additional token metadata (name, description, etc.)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  campaign         Campaign           @relation("CampaignToken", fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId       String             @unique // One token per campaign
+  tokenDistributions TokenDistribution[] @relation("TokenDistributions")
+
+  @@index([campaignId])
+  @@index([issuerAddress])
+  @@map("tokens")
+}
+
+// TokenDistribution model - tracks token distributions to investors
+model TokenDistribution {
+  id                 String   @id @default(cuid())
+  investorAddress    String   // XRPL wallet address of investor
+  amount             Decimal  @db.Decimal(18, 2) // Amount of tokens distributed
+  transactionHash    String?  // XRPL transaction hash
+  trustlineVerified  Boolean  @default(false) // Whether trustline was verified before distribution
+  distributedAt      DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  // Relations
+  token   Token  @relation("TokenDistributions", fields: [tokenId], references: [id], onDelete: Cascade)
+  tokenId String
+
+  @@index([tokenId])
+  @@index([investorAddress])
+  @@map("token_distributions")
+}
+
+// Enums
+enum Role {
+  STARTUP
+  INVESTOR
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DividendStatus {
+  PENDING      // Dividend created, not yet distributed
+  DISTRIBUTING // Distribution in progress
+  DISTRIBUTED  // All payments successful
+  PARTIAL      // Some payments succeeded, some failed
+  FAILED       // All payments failed or critical error
+}
+
+enum DividendPaymentStatus {
+  PENDING   // Payment not yet attempted
+  SUCCESS   // Payment sent successfully
+  FAILED    // Payment failed
+}
+
+enum DistributionType {
+  BY_INVESTMENT // Distribute proportionally by investment amount
+  BY_TOKENS     // Distribute proportionally by token holdings
+}
+
+enum TokenStatus {
+  ISSUED      // Token has been issued
+  DISTRIBUTING // Distribution in progress
+  DISTRIBUTED  // All tokens distributed
+  CANCELLED    // Token cancelled
+}

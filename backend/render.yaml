@@ -1,0 +1,91 @@
+services:
+  # Backend API Service
+  - type: web
+    name: xrpl-platform-api
+    env: node
+    region: frankfurt  # or oregon, ohio, singapore
+    plan: starter  # free tier
+    buildCommand: npm ci && npx prisma generate
+    startCommand: npm start
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: xrpl-platform-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: XRPL_SERVER
+        value: wss://s.altnet.rippletest.net:51233
+      - key: XRPL_PLATFORM_SEED
+        sync: false  # Must be set manually in Render dashboard
+      - key: CORS_ORIGIN
+        value: https://xrpl-platform.vercel.app,http://localhost:5173
+      - key: LOG_LEVEL
+        value: info
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 100
+    
+    autoDeploy: true
+    
+    # Health check configuration
+    healthCheck:
+      httpPath: /health/live
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 3
+
+databases:
+  # PostgreSQL Database
+  - name: xrpl-platform-db
+    databaseName: xrpl_platform
+    user: xrpl_user
+    plan: free  # Free tier: 1GB storage, 97 hours/month
+    region: frankfurt
+    postgresMajorVersion: 15
+    
+    # Automatic backups
+    backupRetentionDays: 7
+    
+    # Connection pooling
+    connectionPooling: true
+    maxConnections: 20
+
+# Optional: Background Worker
+# - type: worker
+#   name: xrpl-platform-worker
+#   env: node
+#   region: frankfurt
+#   plan: starter
+#   buildCommand: npm ci
+#   startCommand: node src/workers/dividendWorker.js
+#   envVars:
+#     - key: NODE_ENV
+#       value: production
+#     - key: DATABASE_URL
+#       fromDatabase:
+#         name: xrpl-platform-db
+#         property: connectionString
+
+# Optional: Cron Jobs
+# - type: cron
+#   name: daily-dividend-distribution
+#   schedule: "0 0 * * *"  # Every day at midnight UTC
+#   command: node src/scripts/distributeDividends.js
+#   env: node
+#   region: frankfurt
+#   envVars:
+#     - key: DATABASE_URL
+#       fromDatabase:
+#         name: xrpl-platform-db
+#         property: connectionString
