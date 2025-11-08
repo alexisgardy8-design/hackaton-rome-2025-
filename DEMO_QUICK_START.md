@@ -1,65 +1,123 @@
-# ⚡ Démo Rapide - Wallet XRPL & Tokenisation
+# 🚀 Guide de Démonstration Rapide - XRise
 
-Guide ultra-rapide pour démontrer la connexion wallet et la tokenisation sur XRPL Testnet.
+Guide rapide pour démarrer une démonstration en 5 minutes.
 
-## 🚀 En 3 commandes
+## ⚡ Démarrage rapide
 
-### 1. Démarrer le backend
+### 1. Préparer l'environnement (2 min)
+
 ```bash
-cd hackaton-rome-2025-/backend && npm run dev
+# Terminal 1: Backend
+cd backend && npm run dev
+
+# Terminal 2: Frontend Startup
+cd frontend-startuper && npm run dev
+
+# Terminal 3: Frontend User
+cd frontend-user && npm run dev
 ```
 
-### 2. Lancer la démo automatique
+### 2. Préparer les données de test (1 min)
+
 ```bash
-cd hackaton-rome-2025-/backend/scripts && ./demo-xrpl-live.sh
+# Exécuter le script de préparation
+./scripts/demo-setup.sh
 ```
 
-### 3. Ouvrir XRPL Explorer
+### 3. Vérifier que tout fonctionne (1 min)
+
+```bash
+# Vérifier le backend
+curl http://localhost:3000/health
+
+# Vérifier les frontends
+# Ouvrir http://localhost:8080 (Startup)
+# Ouvrir http://localhost:8081 (User)
 ```
-https://testnet.xrpl.org/
-```
 
-## 🎯 Ce que la démo montre
+## 🎬 Scénario de démo rapide (5 min)
 
-1. ✅ **Génération d'un wallet XRPL Testnet** (automatiquement financé)
-2. ✅ **Transaction XRPL réelle** (visible sur Explorer)
-3. ✅ **Émission d'un token personnalisé** (sur la blockchain)
-4. ✅ **Vérification sur XRPL Explorer** (preuve blockchain)
+### Étape 1: Créer une campagne (1 min)
+1. Ouvrir http://localhost:8080
+2. Se connecter: `demo-startup@test.com` / `Demo123!`
+3. Créer une nouvelle campagne
+4. Activer la campagne
 
-## 📱 URLs à avoir ouvertes
+### Étape 2: Investir (2 min)
+1. Ouvrir http://localhost:8081
+2. Se connecter: `demo-investor@test.com` / `Demo123!`
+3. Parcourir les campagnes
+4. Investir dans une campagne
+5. Générer un wallet XRPL Testnet
+6. Envoyer la transaction XRPL
+7. Confirmer l'investissement
 
+### Étape 3: Émettre un token (2 min)
+1. Retourner sur le frontend Startup
+2. Émettre un token pour la campagne
+3. Vérifier sur XRPL Explorer: https://testnet.xrpl.org/
+4. Montrer la transaction blockchain
+
+## 📋 Checklist rapide
+
+- [ ] Backend démarré (port 3000)
+- [ ] Frontend Startup démarré (port 8080)
+- [ ] Frontend User démarré (port 8081)
+- [ ] Script de préparation exécuté
+- [ ] Comptes de démo créés
+- [ ] Campagne de démo créée
+- [ ] Wallet Testnet généré
+
+## 🎯 Points clés à mentionner
+
+1. **Intégration blockchain réelle** : Transactions XRPL Testnet vérifiables
+2. **Architecture moderne** : API RESTful, séparation frontend/backend
+3. **Expérience utilisateur** : Interfaces distinctes pour User/Startup
+4. **Sécurité** : JWT, rate limiting, validation
+
+## 🔗 URLs importantes
+
+- **Frontend User**: http://localhost:8081
+- **Frontend Startup**: http://localhost:8080
+- **Backend API**: http://localhost:3000
 - **XRPL Explorer**: https://testnet.xrpl.org/
-- **Backend API**: http://localhost:3000/health
 
-## 🎤 Script de présentation (2 minutes)
+## 📚 Scripts disponibles
 
-### Introduction (15 sec)
-> "Je vais vous montrer comment notre plateforme utilise XRPL Testnet pour tokeniser des projets. Vous verrez des transactions réelles sur la blockchain."
-
-### Démo (90 sec)
-> "1. Je génère un wallet XRPL Testnet qui est automatiquement financé avec 1000 XRP.
-> 2. Je crée une campagne de crowdfunding.
-> 3. Un investisseur investit avec une transaction XRPL réelle - regardez sur XRPL Explorer.
-> 4. **POINT CLÉ** : Je tokenise la campagne en émettant un token personnalisé sur XRPL.
-> 5. Le token est maintenant visible sur XRPL Explorer - c'est la preuve que ça marche vraiment sur la blockchain !"
-
-### Conclusion (15 sec)
-> "Notre plateforme démontre une intégration complète avec XRPL : transactions vérifiées, émission de tokens, et transparence blockchain totale."
-
-## 🎯 Points clés pour le jury
-
-1. **Pas une simulation** : Vraies transactions XRPL Testnet
-2. **Vérifiable publiquement** : Tout est sur XRPL Explorer
-3. **Tokenisation réelle** : Token émis sur la blockchain
-4. **Intégration complète** : Backend + API + Blockchain
+- `./scripts/demo-setup.sh` - Préparer les données de test
+- `./scripts/demo-presentation.sh` - Guide de présentation interactif
+- `./scripts/demo-checklist.md` - Checklist complète
 
 ## 💡 Conseils
 
-- **Testez avant** : Lancez `./demo-xrpl-live.sh` une fois avant la présentation
-- **Ayez XRPL Explorer ouvert** : Montrez les transactions en direct
-- **Soyez confiant** : C'est une vraie intégration blockchain !
+1. **Testez avant** : Vérifiez que tout fonctionne avant la présentation
+2. **Préparez les données** : Utilisez le script de préparation
+3. **Soyez flexible** : Adaptez-vous aux questions
+4. **Montrez le code** : Si possible, montrez l'architecture
+5. **Restez simple** : Expliquez les concepts de manière accessible
+
+## 🆘 En cas de problème
+
+### Backend ne démarre pas
+```bash
+# Libérer le port 3000
+lsof -ti:3000 | xargs kill -9
+cd backend && npm run dev
+```
+
+### Frontend ne démarre pas
+```bash
+# Libérer les ports
+lsof -ti:8080,8081 | xargs kill -9
+cd frontend-startuper && npm run dev
+cd frontend-user && npm run dev
+```
+
+### Transaction XRPL échoue
+- Vérifier la connexion XRPL Testnet
+- Vérifier le solde du wallet
+- Utiliser le faucet XRPL Testnet si nécessaire
 
 ---
 
-**Bonne démo ! 🚀**
-
+**Bon courage pour votre présentation ! 🎉**
