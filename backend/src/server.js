@@ -9,6 +9,7 @@ import investmentRoutes from './routes/investmentRoutes.js';
 import xrplRoutes from './routes/xrplRoutes.js';
 import tokenRoutes from './routes/tokenRoutes.js';
 import dividendRoutes from './routes/dividendRoutes.js';
+import escrowRoutes from './routes/escrowRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
 import { requestLogger, errorLogger } from './middleware/requestLogger.js';
@@ -84,6 +85,7 @@ app.use('/api/investments', investmentRoutes);
 app.use('/api/xrpl', xrplRoutes);
 app.use('/api', tokenRoutes); // Token routes are prefixed with /api
 app.use('/api', dividendRoutes); // Dividend routes are prefixed with /api
+app.use('/api/escrows', escrowRoutes);
 
 // 404 handler
 app.use((req, res) => {

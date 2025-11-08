@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { body, validationResult } from 'express-validator';
 import { verifyTransaction, getPlatformWallet } from '../lib/xrplClient.js';
+import { verifyEscrowTransaction, finishEscrow } from '../lib/escrowUtils.js';
 
 const prisma = new PrismaClient();
 
@@ -38,8 +39,113 @@ export const confirmInvestmentValidation = [
     .notEmpty()
     .withMessage('Transaction hash is required')
     .isLength({ min: 64, max: 64 })
-    .withMessage('Transaction hash must be 64 characters')
+    .withMessage('Transaction hash must be 64 characters'),
+  body('escrowSequence')
+    .optional()
+    .isInt()
+    .withMessage('Escrow sequence must be an integer'),
+  body('escrowCondition')
+    .optional()
+    .isString()
+    .withMessage('Escrow condition must be a string'),
+  body('escrowPreimage')
+    .optional()
+    .isString()
+    .withMessage('Escrow preimage must be a string')
 ];
+
+/**
+ * Release all escrows for a campaign when it reaches 100%
+ * @param {string} campaignId - Campaign ID
+ */
+const releaseCampaignEscrows = async (campaignId) => {
+  try {
+    // Get all investments with escrows for this campaign
+    const investments = await prisma.investment.findMany({
+      where: {
+        campaignId,
+        escrowSequence: { not: null },
+        escrowCondition: { not: null },
+        escrowPreimage: { not: null },
+        escrowFinished: false
+      },
+      include: {
+        investor: {
+          select: {
+            walletAddress: true
+          }
+        }
+      }
+    });
+
+    if (investments.length === 0) {
+      console.log(`ℹ️  No escrows to release for campaign ${campaignId}`);
+      return;
+    }
+
+    console.log(`🔓 Releasing ${investments.length} escrow(s) for campaign ${campaignId}...`);
+
+    const platformWallet = getPlatformWallet();
+    const platformSeed = process.env.XRPL_PLATFORM_SEED;
+
+    if (!platformSeed) {
+      throw new Error('XRPL_PLATFORM_SEED not configured');
+    }
+
+    // Release each escrow
+    for (const investment of investments) {
+      try {
+        // Get investor wallet address from the escrow transaction
+        // Query the escrow transaction to get the owner (Account field)
+        let investorAddress = investment.investor.walletAddress;
+        
+        // If no wallet address in user profile, get it from the escrow transaction
+        if (!investorAddress && investment.transactionHash) {
+          try {
+            const escrowDetails = await verifyEscrowTransaction(investment.transactionHash);
+            investorAddress = escrowDetails.account; // Account that created the escrow
+          } catch (error) {
+            console.warn(`⚠️  Could not get investor address from escrow transaction: ${error.message}`);
+          }
+        }
+        
+        if (!investorAddress) {
+          console.warn(`⚠️  Investor ${investment.investorId} has no wallet address, skipping escrow release`);
+          continue;
+        }
+
+        // Finish the escrow using the preimage
+        const result = await finishEscrow(
+          platformSeed,
+          investorAddress,
+          investment.escrowSequence,
+          investment.escrowCondition,
+          investment.escrowPreimage
+        );
+
+        // Update investment to mark escrow as finished
+        await prisma.investment.update({
+          where: { id: investment.id },
+          data: {
+            escrowFinished: true,
+            finishedAt: new Date()
+          }
+        });
+
+        console.log(`✅ Escrow released for investment ${investment.id}`);
+        console.log(`   Transaction hash: ${result.hash}`);
+      } catch (error) {
+        console.error(`❌ Failed to release escrow for investment ${investment.id}:`, error.message);
+        // Continue with other escrows even if one fails
+      }
+    }
+
+    console.log(`✅ Finished releasing escrows for campaign ${campaignId}`);
+  } catch (error) {
+    console.error('❌ Error in releaseCampaignEscrows:', error);
+    throw error;
+  }
+};
 
 /**
  * Create investment intent
@@ -167,7 +273,13 @@ export const confirmInvestment = async (req, res, next) => {
     const investment = await prisma.investment.findUnique({
       where: { id: investmentId },
       include: {
-        campaign: true
+        campaign: true,
+        investor: {
+          select: {
+            id: true,
+            walletAddress: true
+          }
+        }
       }
     });
 
@@ -194,12 +306,27 @@ export const confirmInvestment = async (req, res, next) => {
       });
     }
 
-    // PHASE 3: Verify transaction on XRPL Testnet
-    console.log(`🔍 Verifying transaction ${transactionHash} on XRPL...`);
+    // PHASE 3: Verify transaction on XRPL Testnet (escrow or payment)
+    const { escrowSequence, escrowCondition, escrowPreimage, investorAddress } = req.body;
+    const isEscrow = !!escrowSequence && !!escrowCondition && !!escrowPreimage;
+    
+    // Update investor's wallet address if provided
+    if (investorAddress && !investment.investor.walletAddress) {
+      await prisma.user.update({
+        where: { id: investment.investorId },
+        data: { walletAddress: investorAddress }
+      });
+    }
+    
+    console.log(`🔍 Verifying ${isEscrow ? 'escrow' : 'payment'} transaction ${transactionHash} on XRPL...`);
     
     let txDetails;
     try {
-      txDetails = await verifyTransaction(transactionHash);
+      if (isEscrow) {
+        txDetails = await verifyEscrowTransaction(transactionHash);
+      } else {
+        txDetails = await verifyTransaction(transactionHash);
+      }
     } catch (error) {
       return res.status(400).json({
         error: 'Transaction Verification Failed',
@@ -224,8 +351,13 @@ export const confirmInvestment = async (req, res, next) => {
       });
     }
 
-    // Verify transaction is a Payment
-    if (txDetails.transactionType !== 'Payment') {
+    // Verify transaction type
+    if (isEscrow && txDetails.transactionType !== 'EscrowCreate') {
+      return res.status(400).json({
+        error: 'Invalid Transaction Type',
+        message: `Expected EscrowCreate transaction, got ${txDetails.transactionType}`
+      });
+    } else if (!isEscrow && txDetails.transactionType !== 'Payment') {
       return res.status(400).json({
         error: 'Invalid Transaction Type',
         message: `Expected Payment transaction, got ${txDetails.transactionType}`
@@ -236,7 +368,7 @@ export const confirmInvestment = async (req, res, next) => {
     if (txDetails.destination !== PLATFORM_WALLET) {
       return res.status(400).json({
         error: 'Invalid Destination',
-        message: `Payment must be sent to platform wallet: ${PLATFORM_WALLET}`
+        message: `${isEscrow ? 'Escrow' : 'Payment'} must be sent to platform wallet: ${PLATFORM_WALLET}`
       });
     }
 
@@ -252,21 +384,33 @@ export const confirmInvestment = async (req, res, next) => {
       });
     }
 
-    console.log(`✅ Transaction verified successfully`);
+    console.log(`✅ ${isEscrow ? 'Escrow' : 'Transaction'} verified successfully`);
     console.log(`   Amount: ${actualAmount} XRP`);
     console.log(`   From: ${txDetails.account}`);
     console.log(`   To: ${txDetails.destination}`);
+    if (isEscrow) {
+      console.log(`   Condition: ${txDetails.condition}`);
+      console.log(`   FinishAfter: ${new Date(txDetails.finishAfter * 1000).toISOString()}`);
+    }
 
-    // Update investment with transaction hash
+    // Update investment with transaction hash and escrow data
+    const updateData = {
+      transactionHash,
+    };
+    
+    if (isEscrow) {
+      updateData.escrowSequence = escrowSequence;
+      updateData.escrowCondition = escrowCondition;
+      updateData.escrowPreimage = escrowPreimage;
+    }
+    
     const updatedInvestment = await prisma.investment.update({
       where: { id: investmentId },
-      data: {
-        transactionHash
-      }
+      data: updateData
     });
 
     // Update campaign's current amount
-    await prisma.campaign.update({
+    const updatedCampaign = await prisma.campaign.update({
       where: { id: investment.campaignId },
       data: {
         currentAmount: {
@@ -275,10 +419,26 @@ export const confirmInvestment = async (req, res, next) => {
       }
     });
 
-    // Get updated campaign data
-    const updatedCampaign = await prisma.campaign.findUnique({
-      where: { id: investment.campaignId }
-    });
+    // Check if campaign reached 100% and release escrows if needed
+    const percentageFunded = (parseFloat(updatedCampaign.currentAmount) / parseFloat(updatedCampaign.goalAmount)) * 100;
+    
+    if (percentageFunded >= 100 && updatedCampaign.status === 'ACTIVE') {
+      console.log(`🎯 Campaign ${updatedCampaign.id} reached 100%! Releasing escrows...`);
+      
+      // Release all escrows for this campaign
+      try {
+        await releaseCampaignEscrows(updatedCampaign.id);
+      } catch (error) {
+        console.error('❌ Error releasing escrows:', error);
+        // Don't fail the investment confirmation if escrow release fails
+      }
+      
+      // Update campaign status to FUNDED
+      await prisma.campaign.update({
+        where: { id: updatedCampaign.id },
+        data: { status: 'FUNDED' }
+      });
+    }
 
     res.json({
       message: 'Investment confirmed successfully',

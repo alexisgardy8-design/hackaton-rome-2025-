@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Wallet } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { WalletConnect } from './WalletConnect';
 
 const Navbar = () => {
   const location = useLocation();
@@ -52,10 +52,7 @@ const Navbar = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect XUMM Wallet
-            </Button>
+            <WalletConnect />
           </motion.div>
         </div>
       </div>

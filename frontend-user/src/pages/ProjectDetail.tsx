@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import ProgressBar from '@/components/ProgressBar';
 import Timeline from '@/components/Timeline';
 import { mockProjects } from '@/data/mockData';
@@ -7,6 +8,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Lock, Unlock, TrendingUp, DollarSign, Coins } from 'lucide-react';
+import { InvestModal } from '@/components/InvestModal';
+import { useXrpl } from '@/contexts/XrplContext';
+
+const InvestButton = ({ projectId }: { projectId: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { isConnected } = useXrpl();
+  
+  // Platform wallet address (should come from backend or env)
+  const platformWallet = 'rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY';
+
+  return (
+    <>
+      <Button
+        onClick={() => setIsOpen(true)}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+        disabled={!isConnected}
+      >
+        {isConnected ? 'Invest Now' : 'Connect Wallet First'}
+      </Button>
+      <InvestModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        campaignId={projectId}
+        platformWallet={platformWallet}
+        minAmount={1}
+        maxAmount={10000}
+      />
+    </>
+  );
+};
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -156,11 +187,9 @@ const ProjectDetail = () => {
                 <CardContent className="pt-6">
                   <h3 className="text-xl font-bold mb-4">Ready to Invest?</h3>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Connect your XUMM wallet to participate in this fundraise.
+                    Connect your XRPL wallet to participate in this fundraise.
                   </p>
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                    Invest Now
-                  </Button>
+                  <InvestButton projectId={project.id} />
                 </CardContent>
               </Card>
             </motion.div>
